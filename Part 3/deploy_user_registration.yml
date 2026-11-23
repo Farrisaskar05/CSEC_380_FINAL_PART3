@@ -25,7 +25,7 @@
 
     - name: Ensure the database exists
       community.postgresql.postgresql_db:
-        login_db: "{{ db_name }}"
+        name: "{{ db_name }}"
         login_host: "{{ pg_host }}"
         login_port: "{{ pg_port }}"
         login_user: "{{ db_user }}"
@@ -34,7 +34,7 @@
 
     - name: Ensure the users table exists
       community.postgresql.postgresql_query:
-        db: "{{ db_name }}"
+        login_db: "{{ db_name }}"
         login_host: "{{ pg_host }}"
         login_port: "{{ pg_port }}"
         login_user: "{{ db_user }}"
