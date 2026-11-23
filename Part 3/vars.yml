@@ -1,0 +1,10 @@
+pg_container_name: askar_postgres
+pg_image: docker.io/library/postgres:16
+pg_host: 127.0.0.1
+pg_port: 5432
+db_name: flask_db
+db_user: faskar
+db_password: csec380480
+flask_image_name: localhost/user_registration:latest
+flask_container_name: askar_app
+flask_port: 5000

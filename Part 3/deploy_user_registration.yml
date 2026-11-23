@@ -1,0 +1,92 @@
+---
+- name: Play 1 - Deploy Postgres DB and table schema
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: Pull and deploy Postgres container
+      containers.podman.podman_container:
+        name: "{{ pg_container_name }}"
+        image: "{{ pg_image }}"
+        state: started
+        network: host
+        env:
+          POSTGRES_USER: "{{ db_user }}"
+          POSTGRES_PASSWORD: "{{ db_password }}"
+
+    - name: Wait for Postgres to listen on the host port
+      ansible.builtin.wait_for:
+        host: "{{ pg_host }}"
+        port: "{{ pg_port }}"
+        delay: 5
+        timeout: 60
+
+    - name: Ensure the database exists
+      community.postgresql.postgresql_db:
+        name: "{{ db_name }}"
+        login_host: "{{ pg_host }}"
+        login_port: "{{ pg_port }}"
+        login_user: "{{ db_user }}"
+        login_password: "{{ db_password }}"
+        state: present
+
+    - name: Ensure the users table exists
+      community.postgresql.postgresql_query:
+        db: "{{ db_name }}"
+        login_host: "{{ pg_host }}"
+        login_port: "{{ pg_port }}"
+        login_user: "{{ db_user }}"
+        login_password: "{{ db_password }}"
+        query: |
+          CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            first_name VARCHAR(100) NOT NULL,
+            last_name VARCHAR(100) NOT NULL,
+            phone_number VARCHAR(30),
+            email_address VARCHAR(255),
+            department VARCHAR(100)
+          );
+
+- name: Play 2 - Build Flask image from Containerfile
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: Build the Flask image
+      containers.podman.podman_image:
+        name: "{{ flask_image_name }}"
+        path: "{{ playbook_dir }}"
+        build:
+          file: Containerfile
+        state: build
+
+- name: Play 3 - Run Flask container
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: Run the Flask container
+      containers.podman.podman_container:
+        name: "{{ flask_container_name }}"
+        image: "{{ flask_image_name }}"
+        state: started
+        network: host
+
+    - name: Wait for the Flask app to respond
+      ansible.builtin.uri:
+        url: "http://localhost:{{ flask_port }}"
+        status_code: 200
+      register: flask_check
+      retries: 10
+      delay: 3
+      until: flask_check.status == 200
+
+    - name: App summary
+      ansible.builtin.debug:
+        msg: "Flask is up: http://localhost:{{ flask_port }} and connected to Postgres: {{ pg_host }}:{{ pg_port }}/{{ db_name }}"
